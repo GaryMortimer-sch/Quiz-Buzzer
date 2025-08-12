@@ -349,6 +349,9 @@
                     const state = gameDoc.data();
                     if (state.buzzerStatus !== 'armed' && state.buzzerStatus !== 'test') return;
 
+                    // Prevent duplicate buzzes from the same team in one round
+                    if (state.buzzes.some(b => b.teamId === currentTeam)) return;
+
                     const newBuzz = { teamId: currentTeam, timestamp: new Date() };
                     const updatedBuzzes = [...state.buzzes, newBuzz];
                     
@@ -455,4 +458,3 @@
     </script>
 </body>
 </html>
-
