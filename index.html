@@ -151,15 +151,15 @@
             </div>
 
             <!-- Display UI -->
-            <div id="display-ui" class="hidden flex flex-col items-center justify-center min-h-screen w-full relative">
-                <div id="display-scores" class="absolute top-4 right-4 grid grid-cols-3 gap-4 text-white w-full max-w-5xl mx-auto px-4">
-                    <!-- Scores will be injected here -->
+            <div id="display-ui" class="hidden flex flex-col items-center justify-center min-h-screen w-full">
+                <div id="display-scoreboard-view" class="w-full">
+                    <h2 id="display-question-number" class="text-4xl font-semibold text-red-100 mb-8">Question 1</h2>
+                    <div id="display-scores" class="grid grid-cols-1 md:grid-cols-3 gap-8 text-white w-full max-w-5xl mx-auto">
+                        <!-- Scores will be injected here -->
+                    </div>
+                    <h1 class="text-6xl font-black mt-12">Waiting for Buzz...</h1>
                 </div>
-                <div id="display-waiting" class="text-center">
-                    <h2 id="display-question-number" class="text-4xl font-semibold text-red-100 mb-4">Question 1</h2>
-                    <h1 class="text-6xl font-black">Waiting for Buzz...</h1>
-                </div>
-                <div id="display-buzzed" class="hidden text-center">
+                <div id="display-buzzed-view" class="hidden text-center">
                     <div id="buzzed-shape-container" class="flex justify-center items-center mb-4 min-h-[150px]"></div>
                     <h1 id="buzzed-team-name" class="text-7xl font-black"></h1>
                     <p id="buzz-time-display" class="text-3xl font-mono text-yellow-300 mt-2"></p>
@@ -307,8 +307,8 @@
 
         function renderDisplay() {
             const { scores, buzzerStatus, buzzes, questionNumber, roundStartTime } = gameState;
-            const waitingView = document.getElementById('display-waiting');
-            const buzzedView = document.getElementById('display-buzzed');
+            const scoreboardView = document.getElementById('display-scoreboard-view');
+            const buzzedView = document.getElementById('display-buzzed-view');
             const scoresContainer = document.getElementById('display-scores');
 
             document.getElementById('display-question-number').textContent = `Question ${questionNumber}`;
@@ -322,9 +322,8 @@
             
             document.querySelectorAll('#display-scores > div').forEach(el => el.classList.remove('flash'));
 
-            [waitingView, buzzedView].forEach(v => v.classList.add('hidden'));
-
             if (buzzerStatus === 'locked' && buzzes.length > 0) {
+                scoreboardView.classList.add('hidden');
                 buzzedView.classList.remove('hidden');
                 const answeringTeamId = buzzes[0]?.teamId;
                 const teamInfo = TEAMS[answeringTeamId];
@@ -345,8 +344,8 @@
                     }
                 }
             } else {
-                waitingView.classList.remove('hidden');
-                waitingView.querySelector('h1').textContent = 'Waiting for Buzz...';
+                scoreboardView.classList.remove('hidden');
+                buzzedView.classList.add('hidden');
             }
         }
 
