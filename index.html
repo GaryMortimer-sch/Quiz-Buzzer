@@ -71,7 +71,7 @@
             <p class="text-lg text-red-100 mb-8">Choose your role for this device.</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button id="select-quiz-master" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-6 px-4 rounded-lg text-2xl shadow-lg">Quiz Master</button>
-                <button id="select-display" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-6 px-4 rounded-lg text-2xl shadow-lg">Main Display</button>
+                <button id="select-display" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-6 px-4 rounded-lg text-2xl shadow-lg">Score Display</button>
                 <button id="select-team" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-6 px-4 rounded-lg text-2xl shadow-lg">Team Buzzer</button>
             </div>
              <div class="mt-8 p-4 bg-red-600 rounded-lg">
@@ -152,7 +152,7 @@
 
             <!-- Display UI -->
             <div id="display-ui" class="hidden flex flex-col items-center justify-center min-h-screen w-full relative">
-                <div id="display-scores" class="absolute top-4 right-4 grid grid-cols-3 gap-4 text-white">
+                <div id="display-scores" class="absolute top-4 right-4 grid grid-cols-3 gap-4 text-white w-full max-w-5xl mx-auto px-4">
                     <!-- Scores will be injected here -->
                 </div>
                 <div id="display-waiting" class="text-center">
@@ -162,6 +162,7 @@
                 <div id="display-buzzed" class="hidden text-center">
                     <div id="buzzed-shape-container" class="flex justify-center items-center mb-4 min-h-[150px]"></div>
                     <h1 id="buzzed-team-name" class="text-7xl font-black"></h1>
+                    <p id="buzz-time-display" class="text-3xl font-mono text-yellow-300 mt-2"></p>
                 </div>
             </div>
 
@@ -203,6 +204,7 @@
             buzzes: [], // { teamId, timestamp }
             answeredTeams: [], // Teams who have answered incorrectly this round
             questionNumber: 1,
+            roundStartTime: null,
         };
         let gameState = { ...defaultGameState };
         let previousBuzzerStatus = 'reset';
@@ -257,7 +259,7 @@
                     previousBuzzerStatus = gameState.buzzerStatus;
                     renderAll();
                 } else if (currentRole === 'quizMaster') {
-                    updateGameState(defaultGameState);
+                    updateGameState({...defaultGameState, roundStartTime: serverTimestamp()});
                 }
             }, (error) => console.error("Firestore snapshot error:", error));
         }
@@ -289,7 +291,7 @@
                 const answeringTeamId = buzzes[0]?.teamId;
                 if (answeringTeamId) {
                     const team = TEAMS[answeringTeamId];
-                    statusDisplay.textContent = `${team.name.toUpperCase()} is answering...`;
+                    statusDisplay.textContent = `${team.name.toUpperCase()} are answering...`;
                     statusDisplay.className = `p-4 rounded-lg text-2xl font-bold ${team.color}`;
                     document.getElementById(`score-${answeringTeamId}`).classList.add('flash');
                     const points = answeredTeams.length === 0 ? 1 : answeredTeams.length === 1 ? 0.5 : 0.25;
@@ -303,7 +305,7 @@
         }
 
         function renderDisplay() {
-            const { scores, buzzerStatus, buzzes, questionNumber } = gameState;
+            const { scores, buzzerStatus, buzzes, questionNumber, roundStartTime } = gameState;
             const waitingView = document.getElementById('display-waiting');
             const buzzedView = document.getElementById('display-buzzed');
             const scoresContainer = document.getElementById('display-scores');
@@ -311,11 +313,13 @@
             document.getElementById('display-question-number').textContent = `Question ${questionNumber}`;
             scoresContainer.innerHTML = Object.keys(TEAMS).map(teamId => {
                 const team = TEAMS[teamId];
-                return `<div class="${team.color} p-2 rounded-lg text-center shadow-lg">
-                            <div class="text-sm font-bold">${team.name}</div>
-                            <div class="text-3xl font-black">${scores[teamId]}</div>
+                return `<div id="display-score-${teamId}" class="p-4 rounded-lg text-center shadow-2xl transition-all duration-300 ${team.color}">
+                            <div class="text-2xl font-bold">${team.name}</div>
+                            <div class="text-8xl font-black">${scores[teamId]}</div>
                         </div>`;
             }).join('');
+            
+            document.querySelectorAll('#display-scores > div').forEach(el => el.classList.remove('flash'));
 
             [waitingView, buzzedView].forEach(v => v.classList.add('hidden'));
 
@@ -324,11 +328,20 @@
                 const answeringTeamId = buzzes[0]?.teamId;
                 const teamInfo = TEAMS[answeringTeamId];
                 if (teamInfo) {
+                    document.getElementById(`display-score-${answeringTeamId}`)?.classList.add('flash');
                     const shapeContainer = document.getElementById('buzzed-shape-container');
                     shapeContainer.innerHTML = teamInfo.shape === 'triangle'
                         ? `<div class="shape triangle" style="border-bottom-color: ${teamInfo.hex}"></div>`
                         : `<div class="shape ${teamInfo.shape} ${teamInfo.color}"></div>`;
                     document.getElementById('buzzed-team-name').textContent = teamInfo.name;
+
+                    const buzzTimeElement = document.getElementById('buzz-time-display');
+                    if (roundStartTime && buzzes[0].timestamp) {
+                        const startTime = roundStartTime.toMillis();
+                        const buzzTime = buzzes[0].timestamp.toMillis();
+                        const diff = (buzzTime - startTime) / 1000;
+                        buzzTimeElement.textContent = `${diff.toFixed(3)} seconds`;
+                    }
                 }
             } else {
                 waitingView.classList.remove('hidden');
@@ -365,7 +378,7 @@
                 button.classList.add('bg-gray-800');
                 button.textContent = 'LOCKED';
                 const answeringTeamId = gameState.buzzes[0]?.teamId;
-                statusText.textContent = `${TEAMS[answeringTeamId]?.name || 'A team'} is answering.`;
+                statusText.textContent = `${TEAMS[answeringTeamId]?.name || 'A team'} are answering.`;
             }
         }
         
@@ -439,24 +452,25 @@
             window.addEventListener('keyup', (e) => { if (currentRole === 'team' && e.code === 'Space') { e.preventDefault(); handleBuzzIn(); } });
 
             // Master Controls
-            document.getElementById('move-on-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: [], questionNumber: gameState.questionNumber + 1 }));
+            const nextRoundState = () => ({ buzzerStatus: 'reset', buzzes: [], answeredTeams: [], questionNumber: gameState.questionNumber + 1, roundStartTime: serverTimestamp() });
+
+            document.getElementById('move-on-btn').addEventListener('click', () => updateGameState(nextRoundState()));
 
             document.getElementById('correct-btn').addEventListener('click', () => {
                 const answeringTeamId = gameState.buzzes[0]?.teamId;
                 if (!answeringTeamId) return;
                 const points = gameState.answeredTeams.length === 0 ? 1 : gameState.answeredTeams.length === 1 ? 0.5 : 0.25;
                 const newScores = { ...gameState.scores, [answeringTeamId]: gameState.scores[answeringTeamId] + points };
-                updateGameState({ scores: newScores, buzzerStatus: 'reset', buzzes: [], answeredTeams: [], questionNumber: gameState.questionNumber + 1 });
+                updateGameState({ scores: newScores, ...nextRoundState() });
             });
 
             document.getElementById('incorrect-btn').addEventListener('click', () => {
                 const answeringTeamId = gameState.buzzes[0]?.teamId;
                 if (!answeringTeamId) return;
-
                 const newAnsweredTeams = [...gameState.answeredTeams, answeringTeamId];
-                if (newAnsweredTeams.length >= 3) { // All teams answered, round over
-                    updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: [], questionNumber: gameState.questionNumber + 1 });
-                } else { // Re-open buzzers for remaining teams
+                if (newAnsweredTeams.length >= 3) { 
+                    updateGameState(nextRoundState());
+                } else { 
                     updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: newAnsweredTeams });
                 }
             });
@@ -476,7 +490,7 @@
             const resetScoresBtn = document.getElementById('reset-scores-btn');
             resetScoresBtn.addEventListener('click', async () => {
                 if (resetScoresBtn.dataset.confirm === 'true') {
-                    updateGameState({ ...defaultGameState, buzzerStatus: 'reset' });
+                    updateGameState({ ...defaultGameState, buzzerStatus: 'reset', roundStartTime: serverTimestamp() });
                     resetScoresBtn.dataset.confirm = 'false';
                     resetScoresBtn.textContent = 'Reset All Scores';
                     resetScoresBtn.classList.replace('bg-yellow-500', 'bg-red-500');
