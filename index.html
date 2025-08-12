@@ -41,6 +41,14 @@
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
+        /* New flashing animation for the quiz master */
+        .flash {
+            animation: flash-animation 1s infinite;
+        }
+        @keyframes flash-animation {
+            0%, 100% { box-shadow: 0 0 12px 4px rgba(253, 224, 71, 0); }
+            50% { box-shadow: 0 0 24px 12px rgba(253, 224, 71, 0.7); }
+        }
         .hidden { display: none; }
     </style>
 </head>
@@ -94,7 +102,7 @@
             <div id="quiz-master-ui" class="hidden space-y-6">
                 <h1 class="text-3xl font-bold pt-12">Quiz Master Control</h1>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                    <div id="score-trojans" class="bg-blue-800 p-4 rounded-lg">
+                    <div id="score-trojans" class="bg-blue-800 p-4 rounded-lg transition-all duration-300">
                         <h2 class="text-xl font-bold">Trojans</h2>
                         <div class="flex justify-center items-center gap-4 mt-2">
                             <button data-team="trojans" data-action="decrement" class="manual-score-btn bg-pink-600 hover:bg-pink-700 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">-</button>
@@ -102,7 +110,7 @@
                             <button data-team="trojans" data-action="increment" class="manual-score-btn bg-green-500 hover:bg-green-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">+</button>
                         </div>
                     </div>
-                    <div id="score-barbarians" class="bg-green-800 p-4 rounded-lg">
+                    <div id="score-barbarians" class="bg-green-800 p-4 rounded-lg transition-all duration-300">
                         <h2 class="text-xl font-bold">Barbarians</h2>
                          <div class="flex justify-center items-center gap-4 mt-2">
                             <button data-team="barbarians" data-action="decrement" class="manual-score-btn bg-pink-600 hover:bg-pink-700 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">-</button>
@@ -110,7 +118,7 @@
                             <button data-team="barbarians" data-action="increment" class="manual-score-btn bg-green-500 hover:bg-green-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">+</button>
                         </div>
                     </div>
-                    <div id="score-crusaders" class="bg-red-800 p-4 rounded-lg">
+                    <div id="score-crusaders" class="bg-red-800 p-4 rounded-lg transition-all duration-300">
                         <h2 class="text-xl font-bold">Crusaders</h2>
                         <div class="flex justify-center items-center gap-4 mt-2">
                             <button data-team="crusaders" data-action="decrement" class="manual-score-btn bg-pink-600 hover:bg-pink-700 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">-</button>
@@ -174,6 +182,7 @@
             answeringIndex: 0,
         };
         let gameState = { ...defaultGameState };
+        let previousBuzzerStatus = 'reset';
         const gameDocRef = doc(db, `artifacts/${appId}/public/data/buzzerGames`, 'live_game');
 
         const TEAMS = {
@@ -213,8 +222,20 @@
         function setupFirestoreListener() {
             onSnapshot(gameDocRef, (doc) => {
                 if (doc.exists()) {
-                    gameState = { ...defaultGameState, ...doc.data() };
+                    const newGameState = { ...defaultGameState, ...doc.data() };
+
+                    // Play sound for Quiz Master on first buzz
+                    if (currentRole === 'quizMaster' && newGameState.buzzerStatus === 'locked' && previousBuzzerStatus === 'reset') {
+                        const firstBuzzer = newGameState.buzzes[0]?.teamId;
+                        if (firstBuzzer) {
+                            synths[firstBuzzer].triggerAttackRelease(pitches[firstBuzzer], "8n");
+                        }
+                    }
+                    
+                    gameState = newGameState;
+                    previousBuzzerStatus = gameState.buzzerStatus;
                     renderAll();
+
                 } else if (currentRole === 'quizMaster') {
                     updateGameState(defaultGameState);
                 }
@@ -235,7 +256,7 @@
             Object.keys(scores).forEach(teamId => {
                 const scoreContainer = document.getElementById(`score-${teamId}`);
                 scoreContainer.querySelector('p').textContent = scores[teamId];
-                scoreContainer.classList.remove('ring-4', 'ring-yellow-400');
+                scoreContainer.classList.remove('flash'); // Reset flash
             });
 
             const statusDisplay = document.getElementById('buzzer-status-display');
@@ -249,7 +270,7 @@
                     const team = TEAMS[answeringTeamId];
                     statusDisplay.textContent = `${team.name.toUpperCase()} is answering...`;
                     statusDisplay.className = `p-4 rounded-lg text-2xl font-bold ${team.color}`;
-                    document.getElementById(`score-${answeringTeamId}`).classList.add('ring-4', 'ring-yellow-400');
+                    document.getElementById(`score-${answeringTeamId}`).classList.add('flash'); // Add flash
                 }
                 passBtn.disabled = answeringIndex >= buzzes.length - 1;
             } else { // 'reset' state
@@ -362,7 +383,13 @@
             document.getElementById('back-to-roles-btn').addEventListener('click', goHome);
 
             // Role Selection
-            document.getElementById('select-quiz-master').addEventListener('click', () => { currentRole = 'quizMaster'; showView('mainApp'); showUi('quizMaster'); renderAll(); });
+            document.getElementById('select-quiz-master').addEventListener('click', () => { 
+                Tone.start(); // Prepare audio context for quiz master
+                currentRole = 'quizMaster'; 
+                showView('mainApp'); 
+                showUi('quizMaster'); 
+                renderAll(); 
+            });
             document.getElementById('select-display').addEventListener('click', () => { currentRole = 'display'; showView('mainApp'); showUi('display'); renderAll(); });
             document.getElementById('select-team').addEventListener('click', () => showView('teamSelection'));
 
