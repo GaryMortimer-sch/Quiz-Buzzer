@@ -55,6 +55,15 @@
 <body class="bg-red-700 text-white flex items-center justify-center min-h-screen p-4">
 
     <div id="app-container" class="w-full max-w-5xl mx-auto text-center relative">
+        
+        <!-- Error Message Overlay -->
+        <div id="error-message" class="hidden absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div class="bg-red-800 p-8 rounded-lg text-center shadow-lg max-w-lg">
+                <h2 class="text-3xl font-bold mb-4">Connection Error</h2>
+                <p class="text-lg" id="error-text"></p>
+                <p class="mt-4 text-sm text-red-200">The app cannot continue until this is resolved.</p>
+            </div>
+        </div>
 
         <!-- Role Selection View -->
         <div id="role-selection-view">
@@ -164,10 +173,15 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, runTransaction, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- DO NOT EDIT ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" };
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'buzzer-app-default';
-        // --- END DO NOT EDIT ---
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBv0h2xZVQVy6K7JbWBTjKq4jPtp_GbVAs",
+            authDomain: "clifton-buzzer.firebaseapp.com",
+            projectId: "clifton-buzzer",
+            storageBucket: "clifton-buzzer.appspot.com",
+            messagingSenderId: "868178482282",
+            appId: "1:868178482282:web:10f5e051cf8b7e637d6613"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -183,6 +197,8 @@
         };
         let gameState = { ...defaultGameState };
         let previousBuzzerStatus = 'reset';
+        // Use a static App ID since this is a public app now
+        const appId = 'clifton-buzzer-main'; 
         const gameDocRef = doc(db, `artifacts/${appId}/public/data/buzzerGames`, 'live_game');
 
         const TEAMS = {
@@ -368,15 +384,17 @@
                 }
             });
 
-            (async () => {
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (error) { console.error("Authentication failed:", error); }
-            })();
+            signInAnonymously(auth).catch((error) => {
+                console.error("Anonymous sign-in failed:", error);
+                const errorDiv = document.getElementById('error-message');
+                const errorText = document.getElementById('error-text');
+                if (error.code === 'auth/configuration-not-found') {
+                    errorText.innerHTML = '<strong>Firebase Authentication Error:</strong><br>Anonymous sign-in is not enabled for this project. Please go to your Firebase Console -> Authentication -> Sign-in method, and enable the "Anonymous" provider.';
+                } else {
+                    errorText.textContent = `An unexpected error occurred: ${error.message}`;
+                }
+                errorDiv.classList.remove('hidden');
+            });
 
             // Navigation
             document.getElementById('home-btn').addEventListener('click', goHome);
