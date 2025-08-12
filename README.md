@@ -1,0 +1,1 @@
+A simple scoring system for our sschool book competition, it allows three teams to use chromebooks and hit the space bar to buzz in, a quizmaster to control scores and a display element to be shown on a projector.
