@@ -100,7 +100,7 @@
         </div>
 
         <!-- Main App View -->
-        <div id="main-app-view" class="hidden relative">
+        <div id="main-app-view" class="hidden relative w-full h-full">
              <div id="home-button-container" class="absolute top-0 left-0 z-10">
                 <button id="home-btn" class="bg-red-600 hover:bg-red-500 text-white p-3 rounded-full shadow-lg">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -149,7 +149,10 @@
             </div>
 
             <!-- Display UI -->
-            <div id="display-ui" class="hidden flex flex-col items-center justify-center min-h-[80vh] w-full">
+            <div id="display-ui" class="hidden flex flex-col items-center justify-center min-h-screen w-full relative">
+                <div id="display-scores" class="absolute top-4 right-4 grid grid-cols-3 gap-4 text-white">
+                    <!-- Scores will be injected here -->
+                </div>
                 <div id="display-waiting" class="text-center">
                     <h1 class="text-6xl font-black">Waiting for Buzz...</h1>
                 </div>
@@ -160,10 +163,12 @@
             </div>
 
             <!-- Team UI -->
-            <div id="team-ui" class="hidden flex flex-col items-center justify-center min-h-[80vh]">
-                <h1 id="team-name-header" class="text-5xl font-bold mb-4"></h1>
-                <div id="team-buzzer-button" class="w-full max-w-md h-64 rounded-2xl flex items-center justify-center text-5xl font-black cursor-pointer select-none buzzer-button transition-all"></div>
-                <p id="team-status-text" class="mt-4 text-2xl text-red-100"></p>
+            <div id="team-ui-wrapper" class="hidden w-full h-full">
+                <div id="team-ui" class="w-full h-full flex flex-col items-center justify-center min-h-screen">
+                    <h1 id="team-name-header" class="text-5xl font-bold mb-4"></h1>
+                    <div id="team-buzzer-button" class="w-full max-w-md h-64 rounded-2xl flex items-center justify-center text-5xl font-black cursor-pointer select-none buzzer-button transition-all"></div>
+                    <p id="team-status-text" class="mt-4 text-2xl"></p>
+                </div>
             </div>
         </div>
     </div>
@@ -204,7 +209,7 @@
         const TEAMS = {
             trojans: { name: 'Trojans', color: 'bg-blue-600', hex: '#2563eb', shape: 'circle' },
             barbarians: { name: 'Barbarians', color: 'bg-green-600', hex: '#16a34a', shape: 'triangle' },
-            crusaders: { name: 'Crusaders', color: 'bg-red-600', hex: '#dc2626', shape: 'square' }
+            crusaders: { name: 'Crusaders', color: 'bg-red-700', hex: '#b91c1c', shape: 'square' } // Adjusted Crusaders red to match theme
         };
 
         const synths = {
@@ -222,12 +227,12 @@
         const uis = {
             quizMaster: document.getElementById('quiz-master-ui'),
             display: document.getElementById('display-ui'),
-            team: document.getElementById('team-ui'),
+            team: document.getElementById('team-ui-wrapper'),
         };
 
         function showView(viewId) { Object.values(views).forEach(v => v.classList.add('hidden')); if (views[viewId]) views[viewId].classList.remove('hidden'); }
         function showUi(uiId) { Object.values(uis).forEach(u => u.classList.add('hidden')); if (uis[uiId]) uis[uiId].classList.remove('hidden'); }
-        function goHome() { currentRole = null; currentTeam = null; showView('roleSelection'); }
+        function goHome() { currentRole = null; currentTeam = null; document.body.className = 'bg-red-700 text-white flex items-center justify-center min-h-screen p-4'; showView('roleSelection'); }
 
         async function updateGameState(newState) {
             try {
@@ -297,9 +302,20 @@
         }
 
         function renderDisplay() {
-            const { buzzerStatus, buzzes, answeringIndex } = gameState;
+            const { scores, buzzerStatus, buzzes, answeringIndex } = gameState;
             const waitingView = document.getElementById('display-waiting');
             const buzzedView = document.getElementById('display-buzzed');
+            const scoresContainer = document.getElementById('display-scores');
+
+            // Render scores
+            scoresContainer.innerHTML = Object.keys(TEAMS).map(teamId => {
+                const team = TEAMS[teamId];
+                return `<div class="${team.color} p-2 rounded-lg text-center shadow-lg">
+                            <div class="text-sm font-bold">${team.name}</div>
+                            <div class="text-3xl font-black">${scores[teamId]}</div>
+                        </div>`;
+            }).join('');
+
 
             [waitingView, buzzedView].forEach(v => v.classList.add('hidden'));
 
@@ -327,9 +343,14 @@
             const button = document.getElementById('team-buzzer-button');
             const statusText = document.getElementById('team-status-text');
             const answeringTeamId = buzzes[answeringIndex]?.teamId;
+            
+            // Set background color for the team view
+            document.body.className = `${teamInfo.color} text-white flex items-center justify-center min-h-screen p-4`;
+            statusText.className = 'mt-4 text-2xl text-white/80';
+
 
             document.getElementById('team-name-header').textContent = teamInfo.name;
-            button.classList.remove('bg-green-500', 'bg-red-600', 'bg-yellow-500', 'pulsate', teamInfo.color);
+            button.classList.remove('bg-green-500', 'bg-gray-800', 'bg-yellow-500', 'pulsate');
 
             if (buzzerStatus === 'reset') {
                 button.classList.add('bg-green-500', 'pulsate');
@@ -343,7 +364,7 @@
                     button.textContent = 'YOUR TURN!';
                     statusText.textContent = 'Answer now!';
                 } else {
-                    button.classList.add(teamInfo.color);
+                    button.classList.add('bg-gray-800');
                     button.textContent = 'LOCKED';
                     statusText.textContent = `${TEAMS[answeringTeamId]?.name || 'A team'} is answering.`;
                 }
