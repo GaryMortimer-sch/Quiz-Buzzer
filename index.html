@@ -170,6 +170,7 @@
             <div id="team-ui-wrapper" class="hidden w-full h-full">
                 <div id="team-ui" class="w-full h-full flex flex-col items-center justify-center min-h-screen">
                     <h1 id="team-name-header" class="text-5xl font-bold mb-4"></h1>
+                    <h2 id="team-score-display" class="text-6xl font-black text-yellow-300 mb-4">0</h2>
                     <div id="team-buzzer-button" class="w-full max-w-md h-64 rounded-2xl flex items-center justify-center text-5xl font-black cursor-pointer select-none buzzer-button transition-all"></div>
                     <p id="team-status-text" class="mt-4 text-2xl"></p>
                 </div>
@@ -351,7 +352,7 @@
 
         function renderTeam() {
             if (!currentTeam) return;
-            const { buzzerStatus, answeredTeams } = gameState;
+            const { scores, buzzerStatus, answeredTeams } = gameState;
             const teamInfo = TEAMS[currentTeam];
             const button = document.getElementById('team-buzzer-button');
             const statusText = document.getElementById('team-status-text');
@@ -361,6 +362,7 @@
             statusText.className = 'mt-4 text-2xl text-white/80';
 
             document.getElementById('team-name-header').textContent = teamInfo.name;
+            document.getElementById('team-score-display').textContent = scores[currentTeam];
             button.classList.remove('bg-green-500', 'bg-gray-800', 'bg-yellow-500', 'pulsate');
 
             if (isLockedOut) {
@@ -471,7 +473,7 @@
                 if (newAnsweredTeams.length >= 3) { 
                     updateGameState(nextRoundState());
                 } else { 
-                    updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: newAnsweredTeams });
+                    updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: newAnsweredTeams, roundStartTime: serverTimestamp() });
                 }
             });
             
