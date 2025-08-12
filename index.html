@@ -94,9 +94,30 @@
             <div id="quiz-master-ui" class="hidden space-y-6">
                 <h1 class="text-3xl font-bold pt-12">Quiz Master Control</h1>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                    <div id="score-trojans" class="bg-blue-800 p-4 rounded-lg"><h2 class="text-xl font-bold">Trojans</h2><p class="text-5xl font-black">0</p></div>
-                    <div id="score-barbarians" class="bg-green-800 p-4 rounded-lg"><h2 class="text-xl font-bold">Barbarians</h2><p class="text-5xl font-black">0</p></div>
-                    <div id="score-crusaders" class="bg-red-800 p-4 rounded-lg"><h2 class="text-xl font-bold">Crusaders</h2><p class="text-5xl font-black">0</p></div>
+                    <div id="score-trojans" class="bg-blue-800 p-4 rounded-lg">
+                        <h2 class="text-xl font-bold">Trojans</h2>
+                        <div class="flex justify-center items-center gap-4 mt-2">
+                            <button data-team="trojans" data-action="decrement" class="manual-score-btn bg-pink-600 hover:bg-pink-700 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">-</button>
+                            <p class="text-5xl font-black w-20">0</p>
+                            <button data-team="trojans" data-action="increment" class="manual-score-btn bg-green-500 hover:bg-green-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">+</button>
+                        </div>
+                    </div>
+                    <div id="score-barbarians" class="bg-green-800 p-4 rounded-lg">
+                        <h2 class="text-xl font-bold">Barbarians</h2>
+                         <div class="flex justify-center items-center gap-4 mt-2">
+                            <button data-team="barbarians" data-action="decrement" class="manual-score-btn bg-pink-600 hover:bg-pink-700 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">-</button>
+                            <p class="text-5xl font-black w-20">0</p>
+                            <button data-team="barbarians" data-action="increment" class="manual-score-btn bg-green-500 hover:bg-green-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">+</button>
+                        </div>
+                    </div>
+                    <div id="score-crusaders" class="bg-red-800 p-4 rounded-lg">
+                        <h2 class="text-xl font-bold">Crusaders</h2>
+                        <div class="flex justify-center items-center gap-4 mt-2">
+                            <button data-team="crusaders" data-action="decrement" class="manual-score-btn bg-pink-600 hover:bg-pink-700 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">-</button>
+                            <p class="text-5xl font-black w-20">0</p>
+                            <button data-team="crusaders" data-action="increment" class="manual-score-btn bg-green-500 hover:bg-green-600 rounded-full w-10 h-10 flex items-center justify-center font-bold text-2xl">+</button>
+                        </div>
+                    </div>
                 </div>
                 <div id="buzzer-status-display" class="p-4 rounded-lg text-2xl font-bold bg-red-600 min-h-[68px] flex items-center justify-center">Waiting...</div>
                  <div id="master-controls" class="space-y-4">
@@ -212,8 +233,9 @@
         function renderQuizMaster() {
             const { scores, buzzerStatus, buzzes, answeringIndex } = gameState;
             Object.keys(scores).forEach(teamId => {
-                document.querySelector(`#score-${teamId} p`).textContent = scores[teamId];
-                document.getElementById(`score-${teamId}`).classList.remove('ring-4', 'ring-yellow-400');
+                const scoreContainer = document.getElementById(`score-${teamId}`);
+                scoreContainer.querySelector('p').textContent = scores[teamId];
+                scoreContainer.classList.remove('ring-4', 'ring-yellow-400');
             });
 
             const statusDisplay = document.getElementById('buzzer-status-display');
@@ -306,11 +328,10 @@
                     const state = gameDoc.data();
                     if (state.buzzerStatus !== 'reset') return;
 
-                    // Prevent duplicate buzzes from the same team in one round
                     if (state.buzzes.some(b => b.teamId === currentTeam)) return;
 
                     const newBuzz = { teamId: currentTeam, timestamp: new Date() };
-                    const updatedBuzzes = [...state.buzzes, newBuzz].sort((a,b) => a.timestamp - b.timestamp);
+                    const updatedBuzzes = [...state.buzzes, newBuzz].sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
                     
                     transaction.update(gameDocRef, { buzzerStatus: 'locked', buzzes: updatedBuzzes });
                 });
@@ -368,9 +389,9 @@
                 const answeringTeamId = gameState.buzzes[gameState.answeringIndex]?.teamId;
                 if (!answeringTeamId) return;
                 const newScores = { ...gameState.scores, [answeringTeamId]: gameState.scores[answeringTeamId] - 1 };
-                if (gameState.answeringIndex >= gameState.buzzes.length - 1) { // Last one incorrect
+                if (gameState.answeringIndex >= gameState.buzzes.length - 1) {
                     updateGameState({ scores: newScores, buzzerStatus: 'reset', buzzes: [], answeringIndex: 0 });
-                } else { // Pass to next
+                } else {
                     updateGameState({ scores: newScores, answeringIndex: gameState.answeringIndex + 1 });
                 }
             });
@@ -381,10 +402,25 @@
                 }
             });
 
+            document.getElementById('quiz-master-ui').addEventListener('click', (e) => {
+                const target = e.target.closest('.manual-score-btn');
+                if (!target) return;
+
+                const teamId = target.dataset.team;
+                const action = target.dataset.action;
+                if (!teamId || !action) return;
+
+                const currentScore = gameState.scores[teamId] || 0;
+                const newScore = action === 'increment' ? currentScore + 1 : currentScore - 1;
+
+                const scores = { ...gameState.scores, [teamId]: newScore };
+                updateGameState({ scores });
+            });
+
             const resetScoresBtn = document.getElementById('reset-scores-btn');
             resetScoresBtn.addEventListener('click', async () => {
                 if (resetScoresBtn.dataset.confirm === 'true') {
-                    updateGameState({ ...defaultGameState });
+                    updateGameState({ ...defaultGameState, buzzerStatus: 'reset' });
                     resetScoresBtn.dataset.confirm = 'false';
                     resetScoresBtn.textContent = 'Reset All Scores';
                     resetScoresBtn.classList.replace('bg-yellow-500', 'bg-red-500');
@@ -409,6 +445,3 @@
     </script>
 </body>
 </html>
-
-
-
