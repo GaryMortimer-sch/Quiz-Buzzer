@@ -409,7 +409,10 @@
                 renderAll(); 
             });
             document.getElementById('select-display').addEventListener('click', () => { currentRole = 'display'; showView('mainApp'); showUi('display'); renderAll(); });
-            document.getElementById('select-team').addEventListener('click', () => showView('teamSelection'));
+            document.getElementById('select-team').addEventListener('click', () => {
+                Tone.start(); // Prepare audio context for teams
+                showView('teamSelection');
+            });
 
             // Team Selection
             document.querySelectorAll('.team-select-btn').forEach(btn => {
