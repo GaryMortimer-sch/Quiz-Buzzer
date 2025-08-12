@@ -100,16 +100,15 @@
                 </div>
                 <div id="buzzer-status-display" class="p-4 rounded-lg text-2xl font-bold bg-red-600 min-h-[68px] flex items-center justify-center">Waiting...</div>
                  <div id="master-controls" class="space-y-4">
-                    <div id="pre-buzz-controls" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button id="arm-buzzer-btn" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold p-4 rounded-lg">ARM FOR QUESTION</button>
-                        <button id="test-round-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold p-4 rounded-lg">START TEST ROUND</button>
+                    <div id="pre-buzz-controls">
+                        <button id="arm-buzzer-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold p-4 rounded-lg">ARM FOR QUESTION</button>
                     </div>
                     <div id="post-buzz-controls" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button id="correct-btn" class="bg-green-500 hover:bg-green-600 font-bold p-4 rounded-lg">Correct (+1)</button>
                         <button id="incorrect-btn" class="bg-pink-500 hover:bg-pink-600 font-bold p-4 rounded-lg">Incorrect (-1)</button>
                         <button id="pass-btn" class="bg-sky-500 hover:bg-sky-600 font-bold p-4 rounded-lg">Pass to Next</button>
                     </div>
-                     <button id="reset-round-btn" class="w-full bg-red-600 hover:bg-red-500 font-bold p-4 rounded-lg">RESET ROUND</button>
+                     <button id="reset-round-btn" class="w-full bg-red-600 hover:bg-red-500 font-bold p-4 rounded-lg mt-4">RESET ROUND</button>
                      <button id="reset-scores-btn" class="w-full bg-red-500 hover:bg-red-400 font-bold p-4 rounded-lg mt-4">Reset All Scores</button>
                 </div>
             </div>
@@ -122,10 +121,6 @@
                 <div id="display-buzzed" class="hidden text-center">
                     <div id="buzzed-shape-container" class="flex justify-center items-center mb-4 min-h-[150px]"></div>
                     <h1 id="buzzed-team-name" class="text-7xl font-black"></h1>
-                </div>
-                <div id="display-test-results" class="hidden w-full max-w-2xl">
-                    <h1 class="text-5xl font-black mb-6">Test Round Results</h1>
-                    <div id="test-results-list" class="space-y-3 text-2xl"></div>
                 </div>
             </div>
 
@@ -156,7 +151,7 @@
         let currentTeam = null;
         const defaultGameState = {
             scores: { trojans: 0, barbarians: 0, crusaders: 0 },
-            buzzerStatus: 'reset', // reset, armed, test, locked
+            buzzerStatus: 'reset', // reset, armed, locked
             buzzes: [], // { teamId, timestamp }
             answeringIndex: 0,
         };
@@ -243,8 +238,8 @@
             } else {
                 preBuzzControls.classList.remove('hidden');
                 postBuzzControls.classList.add('hidden');
-                if (buzzerStatus === 'armed' || buzzerStatus === 'test') {
-                    statusDisplay.textContent = `BUZZERS ARMED (${buzzerStatus.toUpperCase()})`;
+                if (buzzerStatus === 'armed') {
+                    statusDisplay.textContent = `BUZZERS ARMED`;
                     statusDisplay.className = 'p-4 rounded-lg text-2xl font-bold bg-green-700 pulsate';
                 } else {
                     statusDisplay.textContent = 'Ready to Start Round';
@@ -257,9 +252,8 @@
             const { buzzerStatus, buzzes, answeringIndex } = gameState;
             const waitingView = document.getElementById('display-waiting');
             const buzzedView = document.getElementById('display-buzzed');
-            const testResultsView = document.getElementById('display-test-results');
 
-            [waitingView, buzzedView, testResultsView].forEach(v => v.classList.add('hidden'));
+            [waitingView, buzzedView].forEach(v => v.classList.add('hidden'));
 
             if (buzzerStatus === 'locked' && buzzes.length > 0) {
                 buzzedView.classList.remove('hidden');
@@ -272,22 +266,9 @@
                         : `<div class="shape ${teamInfo.shape} ${teamInfo.color}"></div>`;
                     document.getElementById('buzzed-team-name').textContent = teamInfo.name;
                 }
-            } else if (buzzerStatus === 'test' && buzzes.length > 0) {
-                testResultsView.classList.remove('hidden');
-                const list = document.getElementById('test-results-list');
-                const sortedBuzzes = [...buzzes].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                const firstTime = sortedBuzzes[0].timestamp.toMillis();
-                list.innerHTML = sortedBuzzes.map((buzz, index) => {
-                    const team = TEAMS[buzz.teamId];
-                    const timeDiff = index === 0 ? 'Fastest!' : `+${((buzz.timestamp.toMillis() - firstTime) / 1000).toFixed(3)}s`;
-                    return `<div class="p-3 rounded-lg flex justify-between items-center ${index === 0 ? team.color : 'bg-red-600'}">
-                        <span>${index + 1}. ${team.name}</span>
-                        <span class="font-mono">${timeDiff}</span>
-                    </div>`;
-                }).join('');
             } else {
                 waitingView.classList.remove('hidden');
-                waitingView.querySelector('h1').textContent = (buzzerStatus === 'armed' || buzzerStatus === 'test') ? 'BUZZERS ARMED' : 'Waiting for Round...';
+                waitingView.querySelector('h1').textContent = buzzerStatus === 'armed' ? 'BUZZERS ARMED' : 'Waiting for Round...';
             }
         }
 
@@ -303,7 +284,7 @@
             document.getElementById('team-name-header').textContent = teamInfo.name;
             button.classList.remove('bg-green-500', 'bg-red-600', 'bg-yellow-500', 'pulsate', teamInfo.color);
 
-            if (buzzerStatus === 'armed' || buzzerStatus === 'test') {
+            if (buzzerStatus === 'armed') {
                 if (myBuzz) {
                     button.classList.add('bg-red-600');
                     button.textContent = 'BUZZED';
@@ -347,19 +328,15 @@
                     if (!gameDoc.exists()) throw "Document does not exist!";
                     
                     const state = gameDoc.data();
-                    if (state.buzzerStatus !== 'armed' && state.buzzerStatus !== 'test') return;
+                    if (state.buzzerStatus !== 'armed') return;
 
                     // Prevent duplicate buzzes from the same team in one round
                     if (state.buzzes.some(b => b.teamId === currentTeam)) return;
 
                     const newBuzz = { teamId: currentTeam, timestamp: new Date() };
-                    const updatedBuzzes = [...state.buzzes, newBuzz];
+                    const updatedBuzzes = [...state.buzzes, newBuzz].sort((a,b) => a.timestamp - b.timestamp);
                     
-                    if (state.buzzerStatus === 'armed') {
-                        transaction.update(gameDocRef, { buzzerStatus: 'locked', buzzes: updatedBuzzes });
-                    } else { // test mode
-                        transaction.update(gameDocRef, { buzzes: updatedBuzzes });
-                    }
+                    transaction.update(gameDocRef, { buzzerStatus: 'locked', buzzes: updatedBuzzes });
                 });
             } catch (e) { console.error("Buzz-in transaction failed: ", e); }
         }
@@ -403,7 +380,6 @@
 
             // Master Controls
             document.getElementById('arm-buzzer-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'armed', buzzes: [], answeringIndex: 0 }));
-            document.getElementById('test-round-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'test', buzzes: [], answeringIndex: 0 }));
             document.getElementById('reset-round-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'reset', buzzes: [], answeringIndex: 0 }));
 
             document.getElementById('correct-btn').addEventListener('click', () => {
@@ -458,3 +434,4 @@
     </script>
 </body>
 </html>
+
