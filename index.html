@@ -138,10 +138,9 @@
                 </div>
                 <div id="buzzer-status-display" class="p-4 rounded-lg text-2xl font-bold bg-red-600 min-h-[68px] flex items-center justify-center">Waiting...</div>
                  <div id="master-controls" class="space-y-4">
-                    <div id="post-buzz-controls" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <button id="correct-btn" class="bg-green-500 hover:bg-green-600 font-bold p-4 rounded-lg">Correct (+1)</button>
-                        <button id="incorrect-btn" class="bg-pink-500 hover:bg-pink-600 font-bold p-4 rounded-lg">Incorrect (-1)</button>
-                        <button id="pass-btn" class="bg-sky-500 hover:bg-sky-600 font-bold p-4 rounded-lg">Pass to Next</button>
+                    <div id="post-buzz-controls" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="correct-btn" class="bg-green-500 hover:bg-green-600 font-bold p-4 rounded-lg">Correct</button>
+                        <button id="incorrect-btn" class="bg-pink-500 hover:bg-pink-600 font-bold p-4 rounded-lg">Incorrect</button>
                     </div>
                      <button id="reset-round-btn" class="w-full bg-red-600 hover:bg-red-500 font-bold p-4 rounded-lg mt-4">RESET ROUND</button>
                      <button id="reset-scores-btn" class="w-full bg-red-500 hover:bg-red-400 font-bold p-4 rounded-lg mt-4">Reset All Scores</button>
@@ -198,18 +197,17 @@
             scores: { trojans: 0, barbarians: 0, crusaders: 0 },
             buzzerStatus: 'reset', // reset, locked
             buzzes: [], // { teamId, timestamp }
-            answeringIndex: 0,
+            answeredTeams: [], // Teams who have answered incorrectly this round
         };
         let gameState = { ...defaultGameState };
         let previousBuzzerStatus = 'reset';
-        // Use a static App ID since this is a public app now
         const appId = 'clifton-buzzer-main'; 
         const gameDocRef = doc(db, `artifacts/${appId}/public/data/buzzerGames`, 'live_game');
 
         const TEAMS = {
             trojans: { name: 'Trojans', color: 'bg-blue-600', hex: '#2563eb', shape: 'circle' },
             barbarians: { name: 'Barbarians', color: 'bg-green-600', hex: '#16a34a', shape: 'triangle' },
-            crusaders: { name: 'Crusaders', color: 'bg-red-700', hex: '#b91c1c', shape: 'square' } // Adjusted Crusaders red to match theme
+            crusaders: { name: 'Crusaders', color: 'bg-red-700', hex: '#b91c1c', shape: 'square' }
         };
 
         const synths = {
@@ -244,19 +242,15 @@
             onSnapshot(gameDocRef, (doc) => {
                 if (doc.exists()) {
                     const newGameState = { ...defaultGameState, ...doc.data() };
-
-                    // Play sound for Quiz Master on first buzz
                     if (currentRole === 'quizMaster' && newGameState.buzzerStatus === 'locked' && previousBuzzerStatus === 'reset') {
                         const firstBuzzer = newGameState.buzzes[0]?.teamId;
                         if (firstBuzzer) {
                             synths[firstBuzzer].triggerAttackRelease(pitches[firstBuzzer], "8n");
                         }
                     }
-                    
                     gameState = newGameState;
                     previousBuzzerStatus = gameState.buzzerStatus;
                     renderAll();
-
                 } else if (currentRole === 'quizMaster') {
                     updateGameState(defaultGameState);
                 }
@@ -273,28 +267,29 @@
         }
 
         function renderQuizMaster() {
-            const { scores, buzzerStatus, buzzes, answeringIndex } = gameState;
+            const { scores, buzzerStatus, buzzes, answeredTeams } = gameState;
             Object.keys(scores).forEach(teamId => {
                 const scoreContainer = document.getElementById(`score-${teamId}`);
                 scoreContainer.querySelector('p').textContent = scores[teamId];
-                scoreContainer.classList.remove('flash'); // Reset flash
+                scoreContainer.classList.remove('flash');
             });
 
             const statusDisplay = document.getElementById('buzzer-status-display');
             const postBuzzControls = document.getElementById('post-buzz-controls');
-            const passBtn = document.getElementById('pass-btn');
+            const correctBtn = document.getElementById('correct-btn');
 
             if (buzzerStatus === 'locked') {
                 postBuzzControls.classList.remove('hidden');
-                const answeringTeamId = buzzes[answeringIndex]?.teamId;
+                const answeringTeamId = buzzes[0]?.teamId;
                 if (answeringTeamId) {
                     const team = TEAMS[answeringTeamId];
                     statusDisplay.textContent = `${team.name.toUpperCase()} is answering...`;
                     statusDisplay.className = `p-4 rounded-lg text-2xl font-bold ${team.color}`;
-                    document.getElementById(`score-${answeringTeamId}`).classList.add('flash'); // Add flash
+                    document.getElementById(`score-${answeringTeamId}`).classList.add('flash');
+                    const points = answeredTeams.length === 0 ? 1 : answeredTeams.length === 1 ? 0.5 : 0.25;
+                    correctBtn.textContent = `Correct (+${points})`;
                 }
-                passBtn.disabled = answeringIndex >= buzzes.length - 1;
-            } else { // 'reset' state
+            } else {
                 postBuzzControls.classList.add('hidden');
                 statusDisplay.textContent = 'Waiting for Buzz...';
                 statusDisplay.className = 'p-4 rounded-lg text-2xl font-bold bg-green-700 pulsate';
@@ -302,12 +297,11 @@
         }
 
         function renderDisplay() {
-            const { scores, buzzerStatus, buzzes, answeringIndex } = gameState;
+            const { scores, buzzerStatus, buzzes } = gameState;
             const waitingView = document.getElementById('display-waiting');
             const buzzedView = document.getElementById('display-buzzed');
             const scoresContainer = document.getElementById('display-scores');
 
-            // Render scores
             scoresContainer.innerHTML = Object.keys(TEAMS).map(teamId => {
                 const team = TEAMS[teamId];
                 return `<div class="${team.color} p-2 rounded-lg text-center shadow-lg">
@@ -316,12 +310,11 @@
                         </div>`;
             }).join('');
 
-
             [waitingView, buzzedView].forEach(v => v.classList.add('hidden'));
 
             if (buzzerStatus === 'locked' && buzzes.length > 0) {
                 buzzedView.classList.remove('hidden');
-                const answeringTeamId = buzzes[answeringIndex]?.teamId;
+                const answeringTeamId = buzzes[0]?.teamId;
                 const teamInfo = TEAMS[answeringTeamId];
                 if (teamInfo) {
                     const shapeContainer = document.getElementById('buzzed-shape-container');
@@ -338,36 +331,34 @@
 
         function renderTeam() {
             if (!currentTeam) return;
-            const { buzzerStatus, buzzes, answeringIndex } = gameState;
+            const { buzzerStatus, answeredTeams } = gameState;
             const teamInfo = TEAMS[currentTeam];
             const button = document.getElementById('team-buzzer-button');
             const statusText = document.getElementById('team-status-text');
-            const answeringTeamId = buzzes[answeringIndex]?.teamId;
+            const isLockedOut = answeredTeams.includes(currentTeam);
             
-            // Set background color for the team view
             document.body.className = `${teamInfo.color} text-white flex items-center justify-center min-h-screen p-4`;
             statusText.className = 'mt-4 text-2xl text-white/80';
-
 
             document.getElementById('team-name-header').textContent = teamInfo.name;
             button.classList.remove('bg-green-500', 'bg-gray-800', 'bg-yellow-500', 'pulsate');
 
-            if (buzzerStatus === 'reset') {
+            if (isLockedOut) {
+                button.classList.add('bg-gray-800');
+                button.textContent = 'LOCKED';
+                statusText.textContent = 'You answered incorrectly this round.';
+                button.dataset.enabled = "false";
+            } else if (buzzerStatus === 'reset') {
                 button.classList.add('bg-green-500', 'pulsate');
                 button.textContent = 'BUZZ IN!';
                 statusText.textContent = 'Waiting for the first buzz!';
                 button.dataset.enabled = "true";
             } else if (buzzerStatus === 'locked') {
                 button.dataset.enabled = "false";
-                if (answeringTeamId === currentTeam) {
-                    button.classList.add('bg-yellow-500');
-                    button.textContent = 'YOUR TURN!';
-                    statusText.textContent = 'Answer now!';
-                } else {
-                    button.classList.add('bg-gray-800');
-                    button.textContent = 'LOCKED';
-                    statusText.textContent = `${TEAMS[answeringTeamId]?.name || 'A team'} is answering.`;
-                }
+                button.classList.add('bg-gray-800');
+                button.textContent = 'LOCKED';
+                const answeringTeamId = gameState.buzzes[0]?.teamId;
+                statusText.textContent = `${TEAMS[answeringTeamId]?.name || 'A team'} is answering.`;
             }
         }
         
@@ -384,14 +375,10 @@
                     if (!gameDoc.exists()) throw "Document does not exist!";
                     
                     const state = gameDoc.data();
-                    if (state.buzzerStatus !== 'reset') return;
-
-                    if (state.buzzes.some(b => b.teamId === currentTeam)) return;
+                    if (state.buzzerStatus !== 'reset' || state.answeredTeams.includes(currentTeam)) return;
 
                     const newBuzz = { teamId: currentTeam, timestamp: new Date() };
-                    const updatedBuzzes = [...state.buzzes, newBuzz].sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                    
-                    transaction.update(gameDocRef, { buzzerStatus: 'locked', buzzes: updatedBuzzes });
+                    transaction.update(gameDocRef, { buzzerStatus: 'locked', buzzes: [newBuzz] });
                 });
             } catch (e) { console.error("Buzz-in transaction failed: ", e); }
         }
@@ -423,7 +410,7 @@
 
             // Role Selection
             document.getElementById('select-quiz-master').addEventListener('click', () => { 
-                Tone.start(); // Prepare audio context for quiz master
+                Tone.start(); 
                 currentRole = 'quizMaster'; 
                 showView('mainApp'); 
                 showUi('quizMaster'); 
@@ -431,7 +418,7 @@
             });
             document.getElementById('select-display').addEventListener('click', () => { currentRole = 'display'; showView('mainApp'); showUi('display'); renderAll(); });
             document.getElementById('select-team').addEventListener('click', () => {
-                Tone.start(); // Prepare audio context for teams
+                Tone.start(); 
                 showView('teamSelection');
             });
 
@@ -445,43 +432,36 @@
             window.addEventListener('keyup', (e) => { if (currentRole === 'team' && e.code === 'Space') { e.preventDefault(); handleBuzzIn(); } });
 
             // Master Controls
-            document.getElementById('reset-round-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'reset', buzzes: [], answeringIndex: 0 }));
+            document.getElementById('reset-round-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: [] }));
 
             document.getElementById('correct-btn').addEventListener('click', () => {
-                const answeringTeamId = gameState.buzzes[gameState.answeringIndex]?.teamId;
+                const answeringTeamId = gameState.buzzes[0]?.teamId;
                 if (!answeringTeamId) return;
-                const newScores = { ...gameState.scores, [answeringTeamId]: gameState.scores[answeringTeamId] + 1 };
-                updateGameState({ scores: newScores, buzzerStatus: 'reset', buzzes: [], answeringIndex: 0 });
+                const points = gameState.answeredTeams.length === 0 ? 1 : gameState.answeredTeams.length === 1 ? 0.5 : 0.25;
+                const newScores = { ...gameState.scores, [answeringTeamId]: gameState.scores[answeringTeamId] + points };
+                updateGameState({ scores: newScores, buzzerStatus: 'reset', buzzes: [], answeredTeams: [] });
             });
 
             document.getElementById('incorrect-btn').addEventListener('click', () => {
-                const answeringTeamId = gameState.buzzes[gameState.answeringIndex]?.teamId;
+                const answeringTeamId = gameState.buzzes[0]?.teamId;
                 if (!answeringTeamId) return;
-                const newScores = { ...gameState.scores, [answeringTeamId]: gameState.scores[answeringTeamId] - 1 };
-                if (gameState.answeringIndex >= gameState.buzzes.length - 1) {
-                    updateGameState({ scores: newScores, buzzerStatus: 'reset', buzzes: [], answeringIndex: 0 });
-                } else {
-                    updateGameState({ scores: newScores, answeringIndex: gameState.answeringIndex + 1 });
+
+                const newAnsweredTeams = [...gameState.answeredTeams, answeringTeamId];
+                if (newAnsweredTeams.length >= 3) { // All teams answered, round over
+                    updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: [] });
+                } else { // Re-open buzzers for remaining teams
+                    updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: newAnsweredTeams });
                 }
             });
             
-            document.getElementById('pass-btn').addEventListener('click', () => {
-                if (gameState.answeringIndex < gameState.buzzes.length - 1) {
-                    updateGameState({ answeringIndex: gameState.answeringIndex + 1 });
-                }
-            });
-
             document.getElementById('quiz-master-ui').addEventListener('click', (e) => {
                 const target = e.target.closest('.manual-score-btn');
                 if (!target) return;
-
                 const teamId = target.dataset.team;
                 const action = target.dataset.action;
                 if (!teamId || !action) return;
-
                 const currentScore = gameState.scores[teamId] || 0;
                 const newScore = action === 'increment' ? currentScore + 1 : currentScore - 1;
-
                 const scores = { ...gameState.scores, [teamId]: newScore };
                 updateGameState({ scores });
             });
