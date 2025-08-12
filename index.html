@@ -232,7 +232,7 @@
                 passBtn.disabled = answeringIndex >= buzzes.length - 1;
             } else { // 'reset' state
                 postBuzzControls.classList.add('hidden');
-                statusDisplay.textContent = 'Ready For Next Question';
+                statusDisplay.textContent = 'Waiting for Buzz...';
                 statusDisplay.className = 'p-4 rounded-lg text-2xl font-bold bg-green-700 pulsate';
             }
         }
@@ -275,7 +275,7 @@
             if (buzzerStatus === 'reset') {
                 button.classList.add('bg-green-500', 'pulsate');
                 button.textContent = 'BUZZ IN!';
-                statusText.textContent = 'Ready for the next question!';
+                statusText.textContent = 'Waiting for the first buzz!';
                 button.dataset.enabled = "true";
             } else if (buzzerStatus === 'locked') {
                 button.dataset.enabled = "false";
@@ -409,5 +409,6 @@
     </script>
 </body>
 </html>
+
 
 
