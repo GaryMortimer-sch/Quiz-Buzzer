@@ -100,9 +100,6 @@
                 </div>
                 <div id="buzzer-status-display" class="p-4 rounded-lg text-2xl font-bold bg-red-600 min-h-[68px] flex items-center justify-center">Waiting...</div>
                  <div id="master-controls" class="space-y-4">
-                    <div id="pre-buzz-controls">
-                        <button id="arm-buzzer-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold p-4 rounded-lg">ARM FOR QUESTION</button>
-                    </div>
                     <div id="post-buzz-controls" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button id="correct-btn" class="bg-green-500 hover:bg-green-600 font-bold p-4 rounded-lg">Correct (+1)</button>
                         <button id="incorrect-btn" class="bg-pink-500 hover:bg-pink-600 font-bold p-4 rounded-lg">Incorrect (-1)</button>
@@ -151,7 +148,7 @@
         let currentTeam = null;
         const defaultGameState = {
             scores: { trojans: 0, barbarians: 0, crusaders: 0 },
-            buzzerStatus: 'reset', // reset, armed, locked
+            buzzerStatus: 'reset', // reset, locked
             buzzes: [], // { teamId, timestamp }
             answeringIndex: 0,
         };
@@ -220,12 +217,10 @@
             });
 
             const statusDisplay = document.getElementById('buzzer-status-display');
-            const preBuzzControls = document.getElementById('pre-buzz-controls');
             const postBuzzControls = document.getElementById('post-buzz-controls');
             const passBtn = document.getElementById('pass-btn');
 
             if (buzzerStatus === 'locked') {
-                preBuzzControls.classList.add('hidden');
                 postBuzzControls.classList.remove('hidden');
                 const answeringTeamId = buzzes[answeringIndex]?.teamId;
                 if (answeringTeamId) {
@@ -235,16 +230,10 @@
                     document.getElementById(`score-${answeringTeamId}`).classList.add('ring-4', 'ring-yellow-400');
                 }
                 passBtn.disabled = answeringIndex >= buzzes.length - 1;
-            } else {
-                preBuzzControls.classList.remove('hidden');
+            } else { // 'reset' state
                 postBuzzControls.classList.add('hidden');
-                if (buzzerStatus === 'armed') {
-                    statusDisplay.textContent = `BUZZERS ARMED`;
-                    statusDisplay.className = 'p-4 rounded-lg text-2xl font-bold bg-green-700 pulsate';
-                } else {
-                    statusDisplay.textContent = 'Ready to Start Round';
-                    statusDisplay.className = 'p-4 rounded-lg text-2xl font-bold bg-red-600';
-                }
+                statusDisplay.textContent = 'Ready For Next Question';
+                statusDisplay.className = 'p-4 rounded-lg text-2xl font-bold bg-green-700 pulsate';
             }
         }
 
@@ -268,7 +257,7 @@
                 }
             } else {
                 waitingView.classList.remove('hidden');
-                waitingView.querySelector('h1').textContent = buzzerStatus === 'armed' ? 'BUZZERS ARMED' : 'Waiting for Round...';
+                waitingView.querySelector('h1').textContent = 'Waiting for Buzz...';
             }
         }
 
@@ -278,24 +267,16 @@
             const teamInfo = TEAMS[currentTeam];
             const button = document.getElementById('team-buzzer-button');
             const statusText = document.getElementById('team-status-text');
-            const myBuzz = buzzes.find(b => b.teamId === currentTeam);
             const answeringTeamId = buzzes[answeringIndex]?.teamId;
 
             document.getElementById('team-name-header').textContent = teamInfo.name;
             button.classList.remove('bg-green-500', 'bg-red-600', 'bg-yellow-500', 'pulsate', teamInfo.color);
 
-            if (buzzerStatus === 'armed') {
-                if (myBuzz) {
-                    button.classList.add('bg-red-600');
-                    button.textContent = 'BUZZED';
-                    statusText.textContent = 'Waiting for others...';
-                    button.dataset.enabled = "false";
-                } else {
-                    button.classList.add('bg-green-500', 'pulsate');
-                    button.textContent = 'BUZZ IN!';
-                    statusText.textContent = 'Buzzer is ARMED!';
-                    button.dataset.enabled = "true";
-                }
+            if (buzzerStatus === 'reset') {
+                button.classList.add('bg-green-500', 'pulsate');
+                button.textContent = 'BUZZ IN!';
+                statusText.textContent = 'Ready for the next question!';
+                button.dataset.enabled = "true";
             } else if (buzzerStatus === 'locked') {
                 button.dataset.enabled = "false";
                 if (answeringTeamId === currentTeam) {
@@ -307,11 +288,6 @@
                     button.textContent = 'LOCKED';
                     statusText.textContent = `${TEAMS[answeringTeamId]?.name || 'A team'} is answering.`;
                 }
-            } else { // reset
-                button.classList.add(teamInfo.color);
-                button.textContent = 'PRESS SPACE OR CLICK';
-                statusText.textContent = 'Waiting for Quiz Master...';
-                button.dataset.enabled = "false";
             }
         }
         
@@ -328,7 +304,7 @@
                     if (!gameDoc.exists()) throw "Document does not exist!";
                     
                     const state = gameDoc.data();
-                    if (state.buzzerStatus !== 'armed') return;
+                    if (state.buzzerStatus !== 'reset') return;
 
                     // Prevent duplicate buzzes from the same team in one round
                     if (state.buzzes.some(b => b.teamId === currentTeam)) return;
@@ -379,7 +355,6 @@
             window.addEventListener('keyup', (e) => { if (currentRole === 'team' && e.code === 'Space') { e.preventDefault(); handleBuzzIn(); } });
 
             // Master Controls
-            document.getElementById('arm-buzzer-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'armed', buzzes: [], answeringIndex: 0 }));
             document.getElementById('reset-round-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'reset', buzzes: [], answeringIndex: 0 }));
 
             document.getElementById('correct-btn').addEventListener('click', () => {
@@ -434,4 +409,5 @@
     </script>
 </body>
 </html>
+
 
