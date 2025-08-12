@@ -138,11 +138,11 @@
                 </div>
                 <div id="buzzer-status-display" class="p-4 rounded-lg text-2xl font-bold bg-red-600 min-h-[68px] flex items-center justify-center">Waiting...</div>
                  <div id="master-controls" class="space-y-4">
-                    <div id="post-buzz-controls" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="post-buzz-controls" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button id="correct-btn" class="bg-green-500 hover:bg-green-600 font-bold p-4 rounded-lg">Correct</button>
                         <button id="incorrect-btn" class="bg-pink-500 hover:bg-pink-600 font-bold p-4 rounded-lg">Incorrect</button>
+                        <button id="move-on-btn" class="bg-gray-500 hover:bg-gray-600 font-bold p-4 rounded-lg">Next Question</button>
                     </div>
-                     <button id="reset-round-btn" class="w-full bg-red-600 hover:bg-red-500 font-bold p-4 rounded-lg mt-4">RESET ROUND</button>
                      <button id="reset-scores-btn" class="w-full bg-red-500 hover:bg-red-400 font-bold p-4 rounded-lg mt-4">Reset All Scores</button>
                 </div>
             </div>
@@ -432,7 +432,7 @@
             window.addEventListener('keyup', (e) => { if (currentRole === 'team' && e.code === 'Space') { e.preventDefault(); handleBuzzIn(); } });
 
             // Master Controls
-            document.getElementById('reset-round-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: [] }));
+            document.getElementById('move-on-btn').addEventListener('click', () => updateGameState({ buzzerStatus: 'reset', buzzes: [], answeredTeams: [] }));
 
             document.getElementById('correct-btn').addEventListener('click', () => {
                 const answeringTeamId = gameState.buzzes[0]?.teamId;
@@ -494,3 +494,4 @@
     </script>
 </body>
 </html>
+
